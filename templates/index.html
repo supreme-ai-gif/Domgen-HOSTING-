@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DOMGEN Hosting</title>
+  <style>
+    body { margin:0; font-family:sans-serif; background:#0d0f1b; color:#fff; }
+    header { background:#2575fc; padding:15px; text-align:center; }
+    .hidden{display:none;}
+    .container{max-width:1000px;margin:auto;padding:20px;}
+    .card{background:#1d1e30;padding:20px;margin:10px 0;border-radius:10px;}
+    input,button{width:100%;padding:10px;margin:5px 0;border-radius:6px;}
+    button{background:#2575fc;color:#fff;cursor:pointer;}
+    button:hover{opacity:0.9;}
+    .btn-whatsapp{background:#25d366;text-decoration:none;color:#fff;padding:10px;display:block;text-align:center;margin-top:10px;}
+    table{width:100%;border-collapse:collapse;margin-top:10px;}
+    th,td{padding:8px;border-bottom:1px solid #444;text-align:left;}
+  </style>
+</head>
+<body>
+<header><h1>🌐 DOMGEN Hosting Service</h1></header>
+<div class="container">
+
+  <!-- Login -->
+  <div class="card" id="loginSection">
+    <h2>Login</h2>
+    <form id="loginForm">
+      <input id="inUser" placeholder="Username" required>
+      <input id="inPass" type="password" placeholder="Password" required>
+      <button type="submit">Login</button>
+    </form>
+    <p>New here? <a href="#" onclick="showCreate()">Create account</a></p>
+    <pre id="authMsg"></pre>
+  </div>
+
+  <!-- Create Account -->
+  <div class="card hidden" id="createSection">
+    <h2>Create Account</h2>
+    <form id="createForm">
+      <input id="newUser" placeholder="Username" required>
+      <input id="newPass" type="password" placeholder="Password" required>
+      <button type="submit">Create</button>
+    </form>
+    <p>Already registered? <a href="#" onclick="showLogin()">Login</a></p>
+    <pre id="createMsg"></pre>
+  </div>
+
+  <!-- User Dashboard -->
+  <div class="card hidden" id="userDashboard">
+    <h2>User Dashboard</h2>
+    <p>Welcome <b id="userLabel"></b> | Uses left: <span id="usesLeft">0</span></p>
+    <input id="siteName" placeholder="Site name">
+    <input id="siteFile" type="file" accept=".zip">
+    <button onclick="uploadSite()">Upload</button>
+    <pre id="uploadResult"></pre>
+    <a class="btn-whatsapp hidden" id="contactBtn" target="_blank">💬 Contact Admin</a>
+    <button onclick="logout()">Logout</button>
+  </div>
+
+  <div class="card hidden" id="redeemSection">
+    <h2>Redeem Code</h2>
+    <input id="redeemInput" placeholder="Enter redeem code">
+    <button onclick="redeem()">Redeem</button>
+    <pre id="redeemResult"></pre>
+  </div>
+
+  <!-- Admin Dashboard -->
+  <div class="card hidden" id="adminDashboard">
+    <h2>Admin Dashboard</h2>
+    <input id="genSlots" type="number" value="5">
+    <input id="genUses" type="number" value="1">
+    <button onclick="generateCode()">Generate Redeem Code</button>
+    <pre id="genResult"></pre>
+    <h3>All Codes</h3>
+    <table id="codesTable"><thead><tr><th>Code</th><th>Slots</th><th>Remaining</th><th>Used By</th></tr></thead><tbody></tbody></table>
+    <h3>All Users</h3>
+    <table id="usersTable"><thead><tr><th>Username</th><th>Role</th><th>Uses Left</th></tr></thead><tbody></tbody></table>
+  </div>
+
+</div>
+
+<script>
+let currentUser=null, currentRole=null;
+
+function showCreate(){loginSection.classList.add("hidden");createSection.classList.remove("hidden");}
+function showLogin(){createSection.classList.add("hidden");loginSection.classList.remove("hidden");}
+
+document.getElementById("loginForm").onsubmit=async e=>{
+  e.preventDefault();
+  let res=await fetch("/login_user",{method:"POST",headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({username:inUser.value,password:inPass.value})});
+  let data=await res.json();
+  if(data.status==="ok"){
+    currentUser=inUser.value;currentRole=data.role;
+    userLabel.textContent=currentUser;
+    usesLeft.textContent=data.uses_left;
+    loginSection.classList.add("hidden");
+    if(currentRole==="admin"){adminDashboard.classList.remove("hidden");loadCodes();loadUsers();}
+    else{userDashboard.classList.remove("hidden");redeemSection.classList.remove("hidden");}
+  }else authMsg.textContent=data.message;
+};
+
+document.getElementById("createForm").onsubmit=async e=>{
+  e.preventDefault();
+  let res=await fetch("/create_account",{method:"POST",headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({username:newUser.value,password:newPass.value})});
+  let data=await res.json();
+  createMsg.textContent=data.message;
+};
+
+async function uploadSite(){
+  let f=siteFile.files[0];if(!f)return;
+  let fd=new FormData();fd.append("username",currentUser);fd.append("site_name",siteName.value);fd.append("file",f);
+  let res=await fetch("/upload",{method:"POST",body:fd});let data=await res.json();
+  uploadResult.textContent=data.message;
+  if(data.contact){contactBtn.href=data.contact;contactBtn.classList.remove("hidden");}
+  usesLeft.textContent=data.uses_left||usesLeft.textContent;
+}
+
+async function redeem(){
+  let res=await fetch("/redeem",{method:"POST",headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({username:currentUser,code:redeemInput.value})});
+  let data=await res.json();redeemResult.textContent=data.message;usesLeft.textContent=data.uses_left||usesLeft.textContent;
+}
+
+async function generateCode(){
+  let res=await fetch("/generate_code",{method:"POST",headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({slots:genSlots.value,uses:genUses.value})});
+  let data=await res.json();genResult.textContent="Code: "+data.code;loadCodes();
+}
+
+async function loadCodes(){
+  let res=await fetch("/list_codes");let data=await res.json();
+  let tbody=codesTable.querySelector("tbody");tbody.innerHTML="";
+  Object.entries(data).forEach(([c,v])=>{
+    tbody.innerHTML+=`<tr><td>${c}</td><td>${v.slots}</td><td>${v.remaining}</td><td>${v.used_by.join(",")}</td></tr>`;
+  });
+}
+
+async function loadUsers(){
+  let res=await fetch("/list_users");let data=await res.json();
+  let tbody=usersTable.querySelector("tbody");tbody.innerHTML="";
+  Object.entries(data).forEach(([u,v])=>{
+    tbody.innerHTML+=`<tr><td>${u}</td><td>${v.role}</td><td>${v.uses_left}</td></tr>`;
+  });
+}
+
+function logout(){location.reload();}
+</script>
+</body>
+</html>
