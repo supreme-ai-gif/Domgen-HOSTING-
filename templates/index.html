@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DOMGEN Hosting Service</title>
+  <style>
+    /* === Base Styles === */
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Roboto, sans-serif;
+      background: linear-gradient(135deg, #1d1e30, #0d0f1b);
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      background: linear-gradient(90deg, #6a11cb, #2575fc);
+      padding: 15px;
+      text-align: center;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 1.6em;
+      letter-spacing: 1px;
+    }
+    main {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      padding: 20px;
+    }
+    .container {
+      width: 100%;
+      max-width: 1000px;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 20px;
+    }
+    .card {
+      background: rgba(255,255,255,0.07);
+      border-radius: 15px;
+      padding: 20px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      backdrop-filter: blur(10px);
+    }
+    .card h2 {
+      margin-top: 0;
+      font-size: 1.3em;
+      border-bottom: 1px solid rgba(255,255,255,0.2);
+      padding-bottom: 8px;
+    }
+    input, button {
+      width: 100%;
+      padding: 10px;
+      margin: 8px 0;
+      border-radius: 8px;
+      border: none;
+      outline: none;
+      font-size: 1em;
+    }
+    input {
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+    }
+    input::placeholder { color: #bbb; }
+    button {
+      background: linear-gradient(90deg, #2575fc, #6a11cb);
+      color: #fff;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    button:hover { opacity: 0.9; }
+    .btn-logout { background: #e63946; }
+    .btn-whatsapp {
+      background: #25d366;
+      display: inline-block;
+      text-align: center;
+      text-decoration: none;
+      font-weight: bold;
+    }
+    .hidden { display: none; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    table th, table td {
+      padding: 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.2);
+      text-align: left;
+    }
+    table th { background: rgba(255,255,255,0.15); }
+    pre {
+      background: rgba(0,0,0,0.4);
+      padding: 10px;
+      border-radius: 8px;
+      max-height: 150px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+    @media (min-width: 768px) {
+      .container {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .container .card:nth-child(1) {
+        grid-column: span 2;
+      }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <h1>🌐 DOMGEN HOSTING SERVICE</h1>
+</header>
+
+<main>
+  <div class="container">
+
+    <!-- Login Section -->
+    <section class="card" id="loginSection">
+      <h2>Login</h2>
+      <form id="loginForm">
+        <input id="inUser" type="text" placeholder="Username" required>
+        <input id="inPass" type="password" placeholder="Password" required>
+        <button type="submit">Login</button>
+        <p>New here? <a href="#" onclick="showCreate()">Create account</a></p>
+      </form>
+      <pre id="authMsg"></pre>
+    </section>
+
+    <!-- Create Account -->
+    <section class="card hidden" id="createSection">
+      <h2>Create Account</h2>
+      <form id="createForm">
+        <input id="newUser" type="text" placeholder="Username" required>
+        <input id="newPass" type="password" placeholder="Password" required>
+        <button type="submit">Create</button>
+        <p>Already have account? <a href="#" onclick="showLogin()">Login</a></p>
+      </form>
+      <pre id="createMsg"></pre>
+    </section>
+
+    <!-- User Dashboard -->
+    <section class="card hidden" id="userDashboard">
+      <h2>User Dashboard</h2>
+      <p>Welcome, <strong id="userLabel"></strong> | Uses left: <span id="usesLeft">0</span></p>
+      <input id="siteName" placeholder="Site name">
+      <input id="siteFile" type="file" accept=".zip">
+      <button onclick="uploadSite()">Upload</button>
+      <pre id="uploadResult"></pre>
+      <a id="contactBtn" class="btn-whatsapp hidden" href="https://chat.whatsapp.com/KA28UYJhcCiHneYVHxcCdk" target="_blank">💬 Contact Admin</a>
+      <button class="btn-logout" onclick="logout()">Logout</button>
+    </section>
+
+    <!-- Sites -->
+    <section class="card hidden" id="sitesSection">
+      <h2>Your Sites</h2>
+      <button onclick="listSites()">Refresh</button>
+      <table id="sitesTable"><thead><tr><th>Site</th><th>Link</th></tr></thead><tbody></tbody></table>
+    </section>
+
+    <!-- Redeem -->
+    <section class="card hidden" id="redeemSection">
+      <h2>Redeem Code</h2>
+      <input id="redeemInput" placeholder="Enter redeem code">
+      <button onclick="redeem()">Redeem</button>
+      <pre id="redeemResult"></pre>
+    </section>
+
+    <!-- Admin Dashboard -->
+    <section class="card hidden" id="adminDashboard">
+      <h2>Admin Dashboard</h2>
+      <input id="adminSiteName" placeholder="Site name">
+      <input id="adminSiteFile" type="file" accept=".zip">
+      <button onclick="adminUpload()">Upload Site</button>
+      <pre id="adminUploadResult"></pre>
+    </section>
+
+    <section class="card hidden" id="adminCodes">
+      <h2>Redeem Codes</h2>
+      <input id="genSlots" type="number" placeholder="Slots" value="5">
+      <input id="genUses" type="number" placeholder="Uses" value="1">
+      <button onclick="generateCode()">Generate Code</button>
+      <pre id="genResult"></pre>
+      <table id="codesTable"><thead><tr><th>Code</th><th>Slots</th><th>Remaining</th><th>Used By</th></tr></thead><tbody></tbody></table>
+    </section>
+
+    <section class="card hidden" id="adminUsers">
+      <h2>All Users</h2>
+      <table id="usersTable"><thead><tr><th>Username</th><th>Uses Left</th></tr></thead><tbody></tbody></table>
+    </section>
+
+  </div>
+</main>
+
+<script>
+const API = "https://dom-gen-.onrender.com"; // change after hosting
+let currentUser = null, isAdmin = false;
+
+function showCreate(){ document.getElementById("loginSection").classList.add("hidden"); document.getElementById("createSection").classList.remove("hidden"); }
+function showLogin(){ document.getElementById("createSection").classList.add("hidden"); document.getElementById("loginSection").classList.remove("hidden"); }
+
+document.getElementById("loginForm").onsubmit = async e => {
+  e.preventDefault();
+  const res = await fetch(API+"/login_user",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:inUser.value,password:inPass.value})});
+  const data = await res.json();
+  if(data.success){
+    currentUser = inUser.value; isAdmin = (data.role==="admin");
+    document.getElementById("loginSection").classList.add("hidden");
+    if(isAdmin){ document.getElementById("adminDashboard").classList.remove("hidden"); document.getElementById("adminCodes").classList.remove("hidden"); document.getElementById("adminUsers").classList.remove("hidden"); listCodes(); listUsers(); }
+    else { document.getElementById("userDashboard").classList.remove("hidden"); document.getElementById("sitesSection").classList.remove("hidden"); document.getElementById("redeemSection").classList.remove("hidden"); userLabel.textContent=currentUser; usesLeft.textContent=data.uses; }
+  } else authMsg.textContent=data.message;
+};
+
+document.getElementById("createForm").onsubmit = async e => {
+  e.preventDefault();
+  const res = await fetch(API+"/create_account",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:newUser.value,password:newPass.value})});
+  const data = await res.json(); createMsg.textContent=data.message;
+};
+
+async function uploadSite(){
+  let f = document.getElementById("siteFile").files[0];
+  let fd = new FormData(); fd.append("username", currentUser); fd.append("siteName", siteName.value); fd.append("siteFile", f);
+  const res = await fetch(API+"/upload_site",{method:"POST",body:fd});
+  const data = await res.json(); uploadResult.textContent=data.message; if(data.uses!==undefined) usesLeft.textContent=data.uses; if(data.message.includes("No uses")) contactBtn.classList.remove("hidden");
+}
+
+async function listSites(){
+  sitesTable.querySelector("tbody").innerHTML = "";
+  if(!currentUser) return;
+  const userSites = (await fetch(API+"/list_users")).json(); // simplified
+}
+
+async function redeem(){
+  const res = await fetch(API+"/redeem",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:currentUser,code:redeemInput.value})});
+  const data = await res.json(); redeemResult.textContent=data.message; if(data.uses!==undefined) usesLeft.textContent=data.uses;
+}
+
+async function generateCode(){
+  const res = await fetch(API+"/generate_code",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({slots:genSlots.value,uses:genUses.value})});
+  const data = await res.json(); genResult.textContent="Code: "+data.code; listCodes();
+}
+
+async function listCodes(){
+  const res = await fetch(API+"/list_codes"); const data = await res.json();
+  codesTable.querySelector("tbody").innerHTML="";
+  for(let c in data){ let row=codesTable.insertRow(); row.innerHTML=`<td>${c}</td><td>${data[c].slots}</td><td>${data[c].uses_left}</td><td>${data[c].used_by.join(",")}</td>`; }
+}
+async function listUsers(){
+  const res = await fetch(API+"/list_users"); const data = await res.json();
+  usersTable.querySelector("tbody").innerHTML="";
+  for(let u in data){ let row=usersTable.insertRow(); row.innerHTML=`<td>${u}</td><td>${data[u].uses}</td>`; }
+}
+function logout(){ location.reload(); }
+</script>
+</body>
+</htm
