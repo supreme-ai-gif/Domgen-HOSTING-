@@ -5,148 +5,207 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DOMGEN Hosting</title>
   <style>
-    body { margin:0; font-family:sans-serif; background:#0d0f1b; color:#fff; }
-    header { background:#2575fc; padding:15px; text-align:center; }
-    .hidden{display:none;}
-    .container{max-width:1000px;margin:auto;padding:20px;}
-    .card{background:#1d1e30;padding:20px;margin:10px 0;border-radius:10px;}
-    input,button{width:100%;padding:10px;margin:5px 0;border-radius:6px;}
-    button{background:#2575fc;color:#fff;cursor:pointer;}
-    button:hover{opacity:0.9;}
-    .btn-whatsapp{background:#25d366;text-decoration:none;color:#fff;padding:10px;display:block;text-align:center;margin-top:10px;}
-    table{width:100%;border-collapse:collapse;margin-top:10px;}
-    th,td{padding:8px;border-bottom:1px solid #444;text-align:left;}
+    body {
+      margin: 0; font-family: "Segoe UI", Roboto, sans-serif;
+      background: linear-gradient(135deg, #1d1e30, #0d0f1b); color: #fff;
+      min-height: 100vh; display: flex; flex-direction: column;
+    }
+    header {
+      background: linear-gradient(90deg, #6a11cb, #2575fc);
+      padding: 15px; text-align: center; position: sticky; top: 0; z-index: 1000;
+    }
+    header h1 { margin: 0; font-size: 1.6em; }
+    main { flex: 1; display: flex; justify-content: center; padding: 20px; }
+    .container { width: 100%; max-width: 1000px; display: grid; gap: 20px; }
+    .card {
+      background: rgba(255,255,255,0.07); border-radius: 15px;
+      padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); backdrop-filter: blur(10px);
+    }
+    .card h2 { margin-top: 0; font-size: 1.3em; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 8px; }
+    input, button { width: 100%; padding: 10px; margin: 8px 0;
+      border-radius: 8px; border: none; outline: none; font-size: 1em; }
+    input { background: rgba(255,255,255,0.1); color: #fff; }
+    input::placeholder { color: #bbb; }
+    button { background: linear-gradient(90deg, #2575fc, #6a11cb);
+      color: #fff; font-weight: bold; cursor: pointer; transition: transform 0.2s ease, opacity 0.2s ease; }
+    button:hover { opacity: 0.9; transform: translateY(-2px); }
+    .btn-logout { background: #e63946; }
+    .btn-whatsapp { background: #25d366; text-align: center; text-decoration: none;
+      display: inline-block; padding: 10px; border-radius: 8px; font-weight: bold; }
+    .hidden { display: none; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.2); text-align: left; }
+    th { background: rgba(255,255,255,0.15); }
+    pre { background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px;
+      max-height: 150px; overflow-y: auto; white-space: pre-wrap; }
+    @media (min-width: 768px) {
+      .container { grid-template-columns: repeat(2, 1fr); }
+      .container .card:nth-child(1) { grid-column: span 2; }
+    }
   </style>
 </head>
 <body>
-<header><h1>🌐 DOMGEN Hosting Service</h1></header>
-<div class="container">
+<header><h1>🌐 DOMGEN HOSTING SERVICE</h1></header>
+<main>
+  <div class="container">
 
-  <!-- Login -->
-  <div class="card" id="loginSection">
-    <h2>Login</h2>
-    <form id="loginForm">
-      <input id="inUser" placeholder="Username" required>
-      <input id="inPass" type="password" placeholder="Password" required>
-      <button type="submit">Login</button>
-    </form>
-    <p>New here? <a href="#" onclick="showCreate()">Create account</a></p>
-    <pre id="authMsg"></pre>
+    <!-- Login -->
+    <section class="card" id="loginSection">
+      <h2>Login</h2>
+      <form id="loginForm">
+        <input id="inUser" type="text" placeholder="Username" required>
+        <input id="inPass" type="password" placeholder="Password" required>
+        <button type="submit">Login</button>
+        <p>New here? <a href="#" onclick="showCreate()">Create account</a></p>
+      </form>
+      <pre id="authMsg"></pre>
+    </section>
+
+    <!-- Create Account -->
+    <section class="card hidden" id="createSection">
+      <h2>Create Account</h2>
+      <form id="createForm">
+        <input id="newUser" type="text" placeholder="Username" required>
+        <input id="newPass" type="password" placeholder="Password" required>
+        <button type="submit">Create</button>
+        <p>Already have account? <a href="#" onclick="showLogin()">Login</a></p>
+      </form>
+      <pre id="createMsg"></pre>
+    </section>
+
+    <!-- User Dashboard -->
+    <section class="card hidden" id="userDashboard">
+      <h2>User Dashboard</h2>
+      <p>Welcome, <strong id="userLabel"></strong> | Uses left: <span id="usesLeft">0</span></p>
+      <input id="siteName" placeholder="Site name">
+      <input id="siteFile" type="file" accept=".zip">
+      <button onclick="uploadSite()">Upload</button>
+      <pre id="uploadResult"></pre>
+      <a id="contactBtn" class="btn-whatsapp hidden" href="https://chat.whatsapp.com/KA28UYJhcCiHneYVHxcCdk" target="_blank">💬 Contact Admin</a>
+      <button class="btn-logout" onclick="logout()">Logout</button>
+    </section>
+
+    <!-- User Sites -->
+    <section class="card hidden" id="sitesSection">
+      <h2>Your Sites</h2>
+      <button onclick="listSites()">Refresh</button>
+      <table id="sitesTable"><thead><tr><th>Site</th><th>Files</th><th>Link</th><th>Action</th></tr></thead><tbody></tbody></table>
+    </section>
+
+    <!-- Redeem -->
+    <section class="card hidden" id="redeemSection">
+      <h2>Redeem Code</h2>
+      <input id="redeemInput" placeholder="Enter redeem code">
+      <button onclick="redeem()">Redeem</button>
+      <pre id="redeemResult"></pre>
+    </section>
+
+    <!-- Admin Dashboard -->
+    <section class="card hidden" id="adminDashboard">
+      <h2>Admin Dashboard</h2>
+      <input id="adminSiteName" placeholder="Site name">
+      <input id="adminSiteFile" type="file" accept=".zip">
+      <button onclick="adminUpload()">Upload Site</button>
+      <pre id="adminUploadResult"></pre>
+    </section>
+
+    <!-- Codes -->
+    <section class="card hidden" id="adminCodes">
+      <h2>Redeem Codes</h2>
+      <input id="genSlots" type="number" placeholder="Slots" value="5">
+      <input id="genUses" type="number" placeholder="Uses" value="1">
+      <button onclick="generateCode()">Generate Code</button>
+      <pre id="genResult"></pre>
+      <table id="codesTable"><thead><tr><th>Code</th><th>Slots</th><th>Remaining Uses</th><th>Used By</th></tr></thead><tbody></tbody></table>
+    </section>
+
+    <!-- Users -->
+    <section class="card hidden" id="adminUsers">
+      <h2>All Users</h2>
+      <table id="usersTable"><thead><tr><th>Username</th><th>Uses Left</th></tr></thead><tbody></tbody></table>
+    </section>
+
   </div>
-
-  <!-- Create Account -->
-  <div class="card hidden" id="createSection">
-    <h2>Create Account</h2>
-    <form id="createForm">
-      <input id="newUser" placeholder="Username" required>
-      <input id="newPass" type="password" placeholder="Password" required>
-      <button type="submit">Create</button>
-    </form>
-    <p>Already registered? <a href="#" onclick="showLogin()">Login</a></p>
-    <pre id="createMsg"></pre>
-  </div>
-
-  <!-- User Dashboard -->
-  <div class="card hidden" id="userDashboard">
-    <h2>User Dashboard</h2>
-    <p>Welcome <b id="userLabel"></b> | Uses left: <span id="usesLeft">0</span></p>
-    <input id="siteName" placeholder="Site name">
-    <input id="siteFile" type="file" accept=".zip">
-    <button onclick="uploadSite()">Upload</button>
-    <pre id="uploadResult"></pre>
-    <a class="btn-whatsapp hidden" id="contactBtn" target="_blank">💬 Contact Admin</a>
-    <button onclick="logout()">Logout</button>
-  </div>
-
-  <div class="card hidden" id="redeemSection">
-    <h2>Redeem Code</h2>
-    <input id="redeemInput" placeholder="Enter redeem code">
-    <button onclick="redeem()">Redeem</button>
-    <pre id="redeemResult"></pre>
-  </div>
-
-  <!-- Admin Dashboard -->
-  <div class="card hidden" id="adminDashboard">
-    <h2>Admin Dashboard</h2>
-    <input id="genSlots" type="number" value="5">
-    <input id="genUses" type="number" value="1">
-    <button onclick="generateCode()">Generate Redeem Code</button>
-    <pre id="genResult"></pre>
-    <h3>All Codes</h3>
-    <table id="codesTable"><thead><tr><th>Code</th><th>Slots</th><th>Remaining</th><th>Used By</th></tr></thead><tbody></tbody></table>
-    <h3>All Users</h3>
-    <table id="usersTable"><thead><tr><th>Username</th><th>Role</th><th>Uses Left</th></tr></thead><tbody></tbody></table>
-  </div>
-
-</div>
+</main>
 
 <script>
-let currentUser=null, currentRole=null;
+  const API_BASE = "https://domgen-hosting.onrender.com"; // change to your Render backend link
 
-function showCreate(){loginSection.classList.add("hidden");createSection.classList.remove("hidden");}
-function showLogin(){createSection.classList.add("hidden");loginSection.classList.remove("hidden");}
+  function showCreate(){ loginSection.classList.add("hidden"); createSection.classList.remove("hidden"); }
+  function showLogin(){ createSection.classList.add("hidden"); loginSection.classList.remove("hidden"); }
 
-document.getElementById("loginForm").onsubmit=async e=>{
-  e.preventDefault();
-  let res=await fetch("/login_user",{method:"POST",headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({username:inUser.value,password:inPass.value})});
-  let data=await res.json();
-  if(data.status==="ok"){
-    currentUser=inUser.value;currentRole=data.role;
-    userLabel.textContent=currentUser;
-    usesLeft.textContent=data.uses_left;
-    loginSection.classList.add("hidden");
-    if(currentRole==="admin"){adminDashboard.classList.remove("hidden");loadCodes();loadUsers();}
-    else{userDashboard.classList.remove("hidden");redeemSection.classList.remove("hidden");}
-  }else authMsg.textContent=data.message;
-};
-
-document.getElementById("createForm").onsubmit=async e=>{
-  e.preventDefault();
-  let res=await fetch("/create_account",{method:"POST",headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({username:newUser.value,password:newPass.value})});
-  let data=await res.json();
-  createMsg.textContent=data.message;
-};
-
-async function uploadSite(){
-  let f=siteFile.files[0];if(!f)return;
-  let fd=new FormData();fd.append("username",currentUser);fd.append("site_name",siteName.value);fd.append("file",f);
-  let res=await fetch("/upload",{method:"POST",body:fd});let data=await res.json();
-  uploadResult.textContent=data.message;
-  if(data.contact){contactBtn.href=data.contact;contactBtn.classList.remove("hidden");}
-  usesLeft.textContent=data.uses_left||usesLeft.textContent;
-}
-
-async function redeem(){
-  let res=await fetch("/redeem",{method:"POST",headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({username:currentUser,code:redeemInput.value})});
-  let data=await res.json();redeemResult.textContent=data.message;usesLeft.textContent=data.uses_left||usesLeft.textContent;
-}
-
-async function generateCode(){
-  let res=await fetch("/generate_code",{method:"POST",headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({slots:genSlots.value,uses:genUses.value})});
-  let data=await res.json();genResult.textContent="Code: "+data.code;loadCodes();
-}
-
-async function loadCodes(){
-  let res=await fetch("/list_codes");let data=await res.json();
-  let tbody=codesTable.querySelector("tbody");tbody.innerHTML="";
-  Object.entries(data).forEach(([c,v])=>{
-    tbody.innerHTML+=`<tr><td>${c}</td><td>${v.slots}</td><td>${v.remaining}</td><td>${v.used_by.join(",")}</td></tr>`;
+  // Login
+  document.getElementById("loginForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    let username = inUser.value, password = inPass.value;
+    let res = await fetch(`${API_BASE}/api/login`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password })
+    });
+    let data = await res.json();
+    authMsg.textContent = data.message || JSON.stringify(data);
+    if (res.ok) { localStorage.setItem("user", JSON.stringify(data)); location.reload(); }
   });
-}
 
-async function loadUsers(){
-  let res=await fetch("/list_users");let data=await res.json();
-  let tbody=usersTable.querySelector("tbody");tbody.innerHTML="";
-  Object.entries(data).forEach(([u,v])=>{
-    tbody.innerHTML+=`<tr><td>${u}</td><td>${v.role}</td><td>${v.uses_left}</td></tr>`;
+  // Create account
+  document.getElementById("createForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    let username = newUser.value, password = newPass.value;
+    let res = await fetch(`${API_BASE}/api/create`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password })
+    });
+    let data = await res.json();
+    createMsg.textContent = data.message || JSON.stringify(data);
   });
-}
 
-function logout(){location.reload();}
+  function logout(){ localStorage.removeItem("user"); location.reload(); }
+
+  async function uploadSite(){
+    let user = JSON.parse(localStorage.getItem("user"));
+    let file = siteFile.files[0]; let fd = new FormData();
+    fd.append("file", file); fd.append("site_name", siteName.value); fd.append("username", user.username);
+    let res = await fetch(`${API_BASE}/api/upload`, { method: "POST", body: fd });
+    uploadResult.textContent = (await res.json()).message;
+  }
+
+  async function listSites(){
+    let user = JSON.parse(localStorage.getItem("user"));
+    let res = await fetch(`${API_BASE}/api/sites?username=${user.username}`);
+    let sites = await res.json(); sitesTable.querySelector("tbody").innerHTML = "";
+    sites.forEach(s => sitesTable.querySelector("tbody").innerHTML += `<tr><td>${s.name}</td><td>${s.files}</td><td><a href="${s.link}" target="_blank">Visit</a></td></tr>`);
+  }
+
+  async function redeem(){
+    let user = JSON.parse(localStorage.getItem("user"));
+    let res = await fetch(`${API_BASE}/api/redeem`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: user.username, code: redeemInput.value })
+    });
+    redeemResult.textContent = (await res.json()).message;
+  }
+
+  async function generateCode(){
+    let res = await fetch(`${API_BASE}/api/admin/generate`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slots: genSlots.value, uses: genUses.value })
+    });
+    genResult.textContent = (await res.json()).code;
+  }
+
+  // AUTO-DASHBOARD SWITCH
+  window.onload = async () => {
+    let user = JSON.parse(localStorage.getItem("user"));
+    if (!user) return;
+    loginSection.classList.add("hidden"); createSection.classList.add("hidden");
+    if (user.username === "admin") { // Admin
+      adminDashboard.classList.remove("hidden"); adminCodes.classList.remove("hidden"); adminUsers.classList.remove("hidden");
+    } else { // Normal user
+      userDashboard.classList.remove("hidden"); sitesSection.classList.remove("hidden"); redeemSection.classList.remove("hidden");
+      userLabel.textContent = user.username; usesLeft.textContent = user.uses_left || 0;
+      if ((user.uses_left||0) <= 0) contactBtn.classList.remove("hidden");
+    }
+  }
 </script>
 </body>
 </html>
