@@ -21,7 +21,7 @@
     }
 
     h2 { margin-bottom: 15px; font-size: 20px; color: #4CAF50; }
-    input, button, select {
+    input, button, select, textarea {
       padding: 10px; margin: 8px 0; width: 100%;
       border: 1px solid #ccc; border-radius: 5px; font-size: 14px;
     }
@@ -55,7 +55,18 @@
       <input type="text" id="login-username" placeholder="Username">
       <input type="password" id="login-password" placeholder="Password">
       <button onclick="login()">Login</button>
+      <p>New here? <a href="#" onclick="showCreate()">Create Account</a></p>
       <div id="login-msg" class="msg"></div>
+    </div>
+
+    <!-- CREATE ACCOUNT -->
+    <div id="create-section" class="card hidden">
+      <h2>Create Account</h2>
+      <input type="text" id="create-username" placeholder="Choose Username">
+      <input type="password" id="create-password" placeholder="Choose Password">
+      <button onclick="createAccount()">Create</button>
+      <p>Already registered? <a href="#" onclick="showLogin()">Login</a></p>
+      <div id="create-msg" class="msg"></div>
     </div>
 
     <!-- DASHBOARD -->
@@ -115,10 +126,41 @@
   </div>
 
   <script>
-    const API = "https://domgen-hosting.onrender.com"; // your backend
+    const API = "https://domgen-hosting.onrender.com"; // backend
 
     let currentUser = null;
     let isAdmin = false;
+
+    function showCreate() {
+      document.getElementById("login-section").classList.add("hidden");
+      document.getElementById("create-section").classList.remove("hidden");
+    }
+
+    function showLogin() {
+      document.getElementById("create-section").classList.add("hidden");
+      document.getElementById("login-section").classList.remove("hidden");
+    }
+
+    async function createAccount() {
+      const username = document.getElementById("create-username").value;
+      const password = document.getElementById("create-password").value;
+
+      try {
+        const res = await fetch(`${API}/create_user`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showMsg("create-msg", "✅ Account created! Now login.");
+        } else {
+          showMsg("create-msg", data.error, true);
+        }
+      } catch {
+        showMsg("create-msg", "❌ Server error", true);
+      }
+    }
 
     async function login() {
       const username = document.getElementById("login-username").value;
@@ -145,63 +187,38 @@
           showMsg("login-msg", data.error, true);
         }
       } catch (err) {
-        showMsg("login-msg", "Server error", true);
+        showMsg("login-msg", "❌ Server error", true);
       }
     }
 
+    // Upload from Text
     async function uploadFromText() {
-      const htmlContent = document.getElementById("html-editor").value;
       const siteName = document.getElementById("site-name").value;
-      if (!htmlContent || !siteName) {
-        showMsg("upload-msg", "Enter site name and HTML content.", true);
+      const htmlContent = document.getElementById("html-editor").value;
+
+      if (!siteName || !htmlContent) {
+        showMsg("upload-msg", "❌ Please enter site name and HTML", true);
         return;
       }
-      const blob = new Blob([htmlContent], { type: "text/html" });
-      const file = new File([blob], "index.html", { type: "text/html" });
-      const form = new FormData();
-      form.append("username", currentUser);
-      form.append("site_name", siteName);
 
-      // Create temporary zip with only index.html
-      form.append("file", file);
       try {
-        const res = await fetch(`${API}/host_file`, { method: "POST", body: form });
+        const res = await fetch(`${API}/upload_text`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: currentUser, site_name: siteName, html_content: htmlContent })
+        });
         const data = await res.json();
         if (res.ok) {
-          showMsg("upload-msg", `✅ Hosted: <a href="${API}${data.url}" target="_blank">${API}${data.url}</a>. Uses left: ${data.uses_left}`);
+          showMsg("upload-msg", `✅ Site hosted at: ${data.url}`);
         } else {
           showMsg("upload-msg", data.error, true);
         }
       } catch {
-        showMsg("upload-msg", "Upload failed", true);
+        showMsg("upload-msg", "❌ Upload failed", true);
       }
     }
 
-    document.getElementById("upload-form").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const siteName = document.getElementById("site-name").value;
-      const file = document.getElementById("site-file").files[0];
-      if (!siteName || !file) {
-        showMsg("upload-msg", "Please select site name and file", true);
-        return;
-      }
-      const form = new FormData();
-      form.append("username", currentUser);
-      form.append("site_name", siteName);
-      form.append("file", file);
-      try {
-        const res = await fetch(`${API}/host_file`, { method: "POST", body: form });
-        const data = await res.json();
-        if (res.ok) {
-          showMsg("upload-msg", `✅ Hosted: <a href="${API}${data.url}" target="_blank">${API}${data.url}</a>. Uses left: ${data.uses_left}`);
-        } else {
-          showMsg("upload-msg", data.error, true);
-        }
-      } catch {
-        showMsg("upload-msg", "Upload failed", true);
-      }
-    });
-
+    // Redeem
     async function redeemCode() {
       const code = document.getElementById("redeem-code").value;
       try {
@@ -212,16 +229,17 @@
         });
         const data = await res.json();
         if (res.ok) {
-          showMsg("redeem-msg", `Code redeemed. Uses left: ${data.uses_left}`);
+          showMsg("redeem-msg", "✅ Code redeemed successfully!");
           document.getElementById("uses-info").textContent = `Uses Left: ${data.uses_left}`;
         } else {
           showMsg("redeem-msg", data.error, true);
         }
       } catch {
-        showMsg("redeem-msg", "Redeem failed", true);
+        showMsg("redeem-msg", "❌ Redeem failed", true);
       }
     }
 
+    // Generate code (admin)
     async function generateCode() {
       const slots = document.getElementById("slots").value;
       try {
@@ -232,42 +250,44 @@
         });
         const data = await res.json();
         if (res.ok) {
-          showMsg("code-msg", `New Code: ${data.code} (${data.slots} uses)`);
+          showMsg("code-msg", `✅ Code generated: ${data.code}`);
           loadAdminData();
         } else {
           showMsg("code-msg", data.error, true);
         }
       } catch {
-        showMsg("code-msg", "Generation failed", true);
+        showMsg("code-msg", "❌ Failed to generate code", true);
       }
     }
 
+    // Load admin data
     async function loadAdminData() {
-      // codes
-      const codesRes = await fetch(`${API}/list_codes`);
-      const codes = await codesRes.json();
-      const tbody = document.querySelector("#codes-table tbody");
-      tbody.innerHTML = "";
-      Object.entries(codes).forEach(([code, info]) => {
-        tbody.innerHTML += `<tr><td>${code}</td><td>${info.slots}</td><td>${info.used_by.join(", ")}</td></tr>`;
-      });
+      try {
+        const res = await fetch(`${API}/admin_data`);
+        const data = await res.json();
 
-      // users
-      const usersRes = await fetch(`${API}/list_users`);
-      const users = await usersRes.json();
-      const utbody = document.querySelector("#users-table tbody");
-      utbody.innerHTML = "";
-      Object.entries(users).forEach(([user, info]) => {
-        utbody.innerHTML += `<tr><td>${user}</td><td>${info.uses_left}</td><td>${info.is_admin}</td></tr>`;
-      });
+        const codesTable = document.querySelector("#codes-table tbody");
+        codesTable.innerHTML = "";
+        data.codes.forEach(c => {
+          codesTable.innerHTML += `<tr><td>${c.code}</td><td>${c.slots}</td><td>${c.used_by.join(", ")}</td></tr>`;
+        });
 
-      document.getElementById("admin-section").classList.remove("hidden");
+        const usersTable = document.querySelector("#users-table tbody");
+        usersTable.innerHTML = "";
+        data.users.forEach(u => {
+          usersTable.innerHTML += `<tr><td>${u.username}</td><td>${u.uses_left}</td><td>${u.is_admin}</td></tr>`;
+        });
+
+        document.getElementById("admin-section").classList.remove("hidden");
+      } catch {
+        showMsg("code-msg", "❌ Failed to load admin data", true);
+      }
     }
 
-    function showMsg(id, msg, error=false) {
-      const div = document.getElementById(id);
-      div.innerHTML = msg;
-      div.className = "msg " + (error ? "error" : "success");
+    function showMsg(id, text, isError = false) {
+      const el = document.getElementById(id);
+      el.textContent = text;
+      el.className = "msg " + (isError ? "error" : "success");
     }
   </script>
 </body>
