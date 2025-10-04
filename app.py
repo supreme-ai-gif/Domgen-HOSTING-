@@ -1,223 +1,131 @@
-import os
-import sqlite3
-import secrets
-from flask import Flask, request, jsonify, session, render_template, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, render_template
 from flask_cors import CORS
-from werkzeug.utils import secure_filename
+import os
+import uuid
 
-app = Flask(__name__)
-CORS(app, supports_credentials=True)
+app = Flask(__name__, template_folder="templates", static_folder="sites")
+CORS(app)
 
-# === CONFIG ===
-app.secret_key = "super-secret-key"  # change in production
-UPLOAD_FOLDER = "sites"
-DB_FILE = "database.db"
-ADMIN_USER = "admin"
-ADMIN_PASS = "admin123"
+# In-memory "database"
+users = {
+    "admin": {"password": "admin123", "remaining_uses": 999999, "hosted_sites": [], "is_admin": True}
+}
+codes = {}  # { code: {"uses_left": int, "redeemed_by": []} }
 
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+# Ensure sites folder exists
+if not os.path.exists("sites"):
+    os.makedirs("sites")
 
-# === DATABASE ===
-def init_db():
-    with sqlite3.connect(DB_FILE) as conn:
-        c = conn.cursor()
-        # Users
-        c.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE,
-            password TEXT,
-            uses_left INTEGER
-        )
-        """)
-        # Redeem Codes
-        c.execute("""
-        CREATE TABLE IF NOT EXISTS codes (
-            code TEXT PRIMARY KEY,
-            slots INTEGER,
-            remaining INTEGER
-        )
-        """)
-        # Code usage
-        c.execute("""
-        CREATE TABLE IF NOT EXISTS code_usage (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT,
-            code TEXT
-        )
-        """)
-        # Sites
-        c.execute("""
-        CREATE TABLE IF NOT EXISTS sites (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT,
-            name TEXT,
-            filename TEXT
-        )
-        """)
-        conn.commit()
-
-init_db()
-
-# === HELPERS ===
-def get_user(username):
-    with sqlite3.connect(DB_FILE) as conn:
-        c = conn.cursor()
-        c.execute("SELECT username, password, uses_left FROM users WHERE username=?", (username,))
-        return c.fetchone()
-
-def update_uses(username, uses):
-    with sqlite3.connect(DB_FILE) as conn:
-        c = conn.cursor()
-        c.execute("UPDATE users SET uses_left=? WHERE username=?", (uses, username))
-        conn.commit()
-
-# === ROUTES ===
 @app.route("/")
 def home():
     return render_template("index.html")
 
-# Create account
-@app.route("/create_account", methods=["POST"])
-def create_account():
+@app.route("/register_user", methods=["POST"])
+def register_user():
     data = request.json
     username = data.get("username")
     password = data.get("password")
-    if get_user(username):
+
+    if username in users:
         return jsonify({"success": False, "message": "User already exists"})
-    with sqlite3.connect(DB_FILE) as conn:
-        c = conn.cursor()
-        c.execute("INSERT INTO users (username, password, uses_left) VALUES (?,?,?)",
-                  (username, password, 5))
-        conn.commit()
-    return jsonify({"success": True, "message": "Account created! You have 5 free uses."})
+    users[username] = {"password": password, "remaining_uses": 5, "hosted_sites": [], "is_admin": False}
+    return jsonify({"success": True, "message": "User registered successfully"})
 
-# Login
-@app.route("/login", methods=["POST"])
-def login():
+@app.route("/login_user", methods=["POST"])
+def login_user():
     data = request.json
     username = data.get("username")
     password = data.get("password")
-    user = get_user(username)
-    if user and user[1] == password:
-        session["user"] = username
-        if username == ADMIN_USER:
-            return jsonify({"success": True, "admin": True})
-        return jsonify({"success": True, "uses_left": user[2]})
-    return jsonify({"success": False, "message": "Invalid credentials"})
 
-@app.route("/logout", methods=["POST"])
-def logout():
-    session.pop("user", None)
-    return jsonify({"success": True})
+    user = users.get(username)
+    if user and user["password"] == password:
+        return jsonify({"success": True, "is_admin": user.get("is_admin", False)})
+    return jsonify({"success": False, "message": "Invalid username or password"})
 
-# Upload site
-@app.route("/upload", methods=["POST"])
-def upload():
-    if "user" not in session:
-        return jsonify({"success": False, "message": "Not logged in"})
-    username = session["user"]
-    if username != ADMIN_USER:
-        user = get_user(username)
-        if not user or user[2] <= 0:
-            return jsonify({"success": False, "message": "No uses left. Contact admin for redeem code."})
-        update_uses(username, user[2] - 1)
-    if "file" not in request.files:
-        return jsonify({"success": False, "message": "No file uploaded"})
-    file = request.files["file"]
-    sitename = request.form.get("sitename", "mysite")
-    filename = secure_filename(file.filename)
-    user_folder = os.path.join(UPLOAD_FOLDER, username, sitename)
-    os.makedirs(user_folder, exist_ok=True)
-    file.save(os.path.join(user_folder, filename))
-    with sqlite3.connect(DB_FILE) as conn:
-        c = conn.cursor()
-        c.execute("INSERT INTO sites (username, name, filename) VALUES (?,?,?)",
-                  (username, sitename, filename))
-        conn.commit()
-    return jsonify({"success": True, "message": "Site uploaded!", 
-                    "link": f"/sites/{username}/{sitename}/{filename}"})
-
-# List sites
-@app.route("/list_sites", methods=["GET"])
-def list_sites():
-    if "user" not in session:
-        return jsonify([])
-    username = session["user"]
-    with sqlite3.connect(DB_FILE) as conn:
-        c = conn.cursor()
-        c.execute("SELECT name, filename FROM sites WHERE username=?", (username,))
-        sites = [{"name": n, "filename": f, "link": f"/sites/{username}/{n}/{f}"} for n, f in c.fetchall()]
-    return jsonify(sites)
-
-# Serve sites
-@app.route("/sites/<username>/<sitename>/<filename>")
-def serve_site(username, sitename, filename):
-    return send_from_directory(os.path.join(UPLOAD_FOLDER, username, sitename), filename)
-
-# Redeem codes
-@app.route("/redeem", methods=["POST"])
-def redeem():
-    if "user" not in session:
-        return jsonify({"success": False, "message": "Not logged in"})
+@app.route("/host_site", methods=["POST"])
+def host_site():
     data = request.json
-    code = data.get("code")
-    username = session["user"]
-    with sqlite3.connect(DB_FILE) as conn:
-        c = conn.cursor()
-        c.execute("SELECT code, slots, remaining FROM codes WHERE code=?", (code,))
-        row = c.fetchone()
-        if not row or row[2] <= 0:
-            return jsonify({"success": False, "message": "Invalid or expired code"})
-        c.execute("SELECT * FROM code_usage WHERE username=? AND code=?", (username, code))
-        if c.fetchone():
-            return jsonify({"success": False, "message": "You already used this code"})
-        c.execute("UPDATE codes SET remaining=remaining-1 WHERE code=?", (code,))
-        c.execute("INSERT INTO code_usage (username, code) VALUES (?,?)", (username, code))
-        c.execute("UPDATE users SET uses_left=uses_left+? WHERE username=?", (row[1], username))
-        conn.commit()
-    return jsonify({"success": True, "message": f"Code redeemed! +{row[1]} uses added."})
+    username = data.get("username")
+    site_name = data.get("site_name")
+    content = data.get("content")
 
-# Admin: generate code
+    user = users.get(username)
+    if not user:
+        return jsonify({"success": False, "message": "User not found"})
+
+    if user["remaining_uses"] <= 0:
+        return jsonify({"success": False, "message": "No hosting uses left. Contact admin."})
+
+    user_dir = os.path.join("sites", username)
+    os.makedirs(user_dir, exist_ok=True)
+
+    site_path = os.path.join(user_dir, f"{site_name}.html")
+    with open(site_path, "w", encoding="utf-8") as f:
+        f.write(content)
+
+    if site_name not in user["hosted_sites"]:
+        user["hosted_sites"].append(f"{site_name}.html")
+
+    user["remaining_uses"] -= 1
+    return jsonify({"success": True, "message": f"Site hosted successfully: /sites/{username}/{site_name}.html"})
+
+@app.route("/sites/<username>/<path:filename>")
+def serve_site(username, filename):
+    return send_from_directory(os.path.join("sites", username), filename)
+
+@app.route("/redeem_code", methods=["POST"])
+def redeem_code():
+    data = request.json
+    username = data.get("username")
+    code = data.get("code")
+
+    if code not in codes or codes[code]["uses_left"] <= 0:
+        return jsonify({"success": False, "message": "Invalid or expired code"})
+
+    users[username]["remaining_uses"] +=  codes[code]["uses_left"]
+    codes[code]["redeemed_by"].append(username)
+    codes[code]["uses_left"] = 0  # One-time code
+    return jsonify({"success": True, "message": "Code redeemed successfully"})
+
 @app.route("/generate_code", methods=["POST"])
 def generate_code():
-    if "user" not in session or session["user"] != ADMIN_USER:
-        return jsonify({"success": False, "message": "Admin only"})
     data = request.json
-    slots = int(data.get("slots", 5))
-    uses = int(data.get("uses", 1))
-    code = secrets.token_hex(4).upper()
-    with sqlite3.connect(DB_FILE) as conn:
-        c = conn.cursor()
-        c.execute("INSERT INTO codes (code, slots, remaining) VALUES (?,?,?)", (code, slots, uses))
-        conn.commit()
-    return jsonify({"success": True, "code": code, "slots": slots, "uses": uses})
+    uses = int(data.get("uses", 0))
+    code = str(uuid.uuid4())[:8]
+    codes[code] = {"uses_left": uses, "redeemed_by": []}
+    return jsonify({"success": True, "code": code})
 
-# Admin: list codes
-@app.route("/list_codes")
-def list_codes():
-    if "user" not in session or session["user"] != ADMIN_USER:
-        return jsonify([])
-    with sqlite3.connect(DB_FILE) as conn:
-        c = conn.cursor()
-        c.execute("SELECT code, slots, remaining FROM codes")
-        codes = []
-        for code, slots, remaining in c.fetchall():
-            c.execute("SELECT username FROM code_usage WHERE code=?", (code,))
-            used_by = [u[0] for u in c.fetchall()]
-            codes.append({"code": code, "slots": slots, "remaining": remaining, "used_by": used_by})
-    return jsonify(codes)
+@app.route("/get_user/<username>")
+def get_user(username):
+    user = users.get(username)
+    if not user:
+        return jsonify({"success": False, "message": "User not found"})
+    return jsonify({
+        "success": True,
+        "remaining_uses": user["remaining_uses"],
+        "hosted_sites": user["hosted_sites"]
+    })
 
-# Admin: list users
-@app.route("/list_users")
-def list_users():
-    if "user" not in session or session["user"] != ADMIN_USER:
-        return jsonify([])
-    with sqlite3.connect(DB_FILE) as conn:
-        c = conn.cursor()
-        c.execute("SELECT username, uses_left FROM users")
-        users = [{"username": u, "uses_left": l} for u, l in c.fetchall()]
-    return jsonify(users)
+@app.route("/admin_data")
+def admin_data():
+    user_list = []
+    for uname, info in users.items():
+        if not info.get("is_admin", False):
+            user_list.append({
+                "username": uname,
+                "remaining_uses": info["remaining_uses"],
+                "hosted_sites": info["hosted_sites"]
+            })
+
+    code_list = []
+    for code, info in codes.items():
+        code_list.append({
+            "code": code,
+            "uses_left": info["uses_left"],
+            "redeemed_by": info["redeemed_by"]
+        })
+
+    return jsonify({"users": user_list, "codes": code_list})
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+    app.run(debug=True, host="0.0.0.0", port=5000)
