@@ -1,169 +1,223 @@
-import os, json, uuid, zipfile
-from flask import Flask, request, jsonify, send_from_directory
+import os
+import sqlite3
+import secrets
+from flask import Flask, request, jsonify, session, render_template, send_from_directory
 from flask_cors import CORS
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, supports_credentials=True)
 
-# --- Files & Directories ---
-DATA_FILE = "data.json"
-SITES_DIR = "sites"
-os.makedirs(SITES_DIR, exist_ok=True)
+# === CONFIG ===
+app.secret_key = "super-secret-key"  # change in production
+UPLOAD_FOLDER = "sites"
+DB_FILE = "database.db"
+ADMIN_USER = "admin"
+ADMIN_PASS = "admin123"
 
-# --- Load & Save Data ---
-if not os.path.exists(DATA_FILE):
-    with open(DATA_FILE, "w") as f:
-        json.dump({"users": {}, "codes": {}}, f)
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-def load_data():
-    with open(DATA_FILE, "r") as f:
-        return json.load(f)
+# === DATABASE ===
+def init_db():
+    with sqlite3.connect(DB_FILE) as conn:
+        c = conn.cursor()
+        # Users
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE,
+            password TEXT,
+            uses_left INTEGER
+        )
+        """)
+        # Redeem Codes
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS codes (
+            code TEXT PRIMARY KEY,
+            slots INTEGER,
+            remaining INTEGER
+        )
+        """)
+        # Code usage
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS code_usage (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT,
+            code TEXT
+        )
+        """)
+        # Sites
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS sites (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT,
+            name TEXT,
+            filename TEXT
+        )
+        """)
+        conn.commit()
 
-def save_data(data):
-    with open(DATA_FILE, "w") as f:
-        json.dump(data, f, indent=2)
+init_db()
 
-# --- Create Account ---
-@app.route("/api/create", methods=["POST"])
-def create():
-    data = load_data()
-    body = request.get_json()
-    username, password = body.get("username"), body.get("password")
-    if username in data["users"]:
-        return jsonify({"message": "User already exists"}), 400
-    data["users"][username] = {"password": password, "uses_left": 5, "sites": []}
-    save_data(data)
-    return jsonify({"message": "Account created. 5 free uses granted."})
+# === HELPERS ===
+def get_user(username):
+    with sqlite3.connect(DB_FILE) as conn:
+        c = conn.cursor()
+        c.execute("SELECT username, password, uses_left FROM users WHERE username=?", (username,))
+        return c.fetchone()
 
-# --- Login ---
-@app.route("/api/login", methods=["POST"])
+def update_uses(username, uses):
+    with sqlite3.connect(DB_FILE) as conn:
+        c = conn.cursor()
+        c.execute("UPDATE users SET uses_left=? WHERE username=?", (uses, username))
+        conn.commit()
+
+# === ROUTES ===
+@app.route("/")
+def home():
+    return render_template("index.html")
+
+# Create account
+@app.route("/create_account", methods=["POST"])
+def create_account():
+    data = request.json
+    username = data.get("username")
+    password = data.get("password")
+    if get_user(username):
+        return jsonify({"success": False, "message": "User already exists"})
+    with sqlite3.connect(DB_FILE) as conn:
+        c = conn.cursor()
+        c.execute("INSERT INTO users (username, password, uses_left) VALUES (?,?,?)",
+                  (username, password, 5))
+        conn.commit()
+    return jsonify({"success": True, "message": "Account created! You have 5 free uses."})
+
+# Login
+@app.route("/login", methods=["POST"])
 def login():
-    data = load_data()
-    body = request.get_json()
-    username, password = body.get("username"), body.get("password")
-    if username not in data["users"] or data["users"][username]["password"] != password:
-        return jsonify({"message": "Invalid credentials"}), 400
-    user = data["users"][username]
-    return jsonify({
-        "message": "Login successful",
-        "username": username,
-        "uses_left": user["uses_left"],
-        "role": "admin" if username == "admin" else "user"
-    })
+    data = request.json
+    username = data.get("username")
+    password = data.get("password")
+    user = get_user(username)
+    if user and user[1] == password:
+        session["user"] = username
+        if username == ADMIN_USER:
+            return jsonify({"success": True, "admin": True})
+        return jsonify({"success": True, "uses_left": user[2]})
+    return jsonify({"success": False, "message": "Invalid credentials"})
 
-# --- Upload Site ---
-@app.route("/api/upload", methods=["POST"])
+@app.route("/logout", methods=["POST"])
+def logout():
+    session.pop("user", None)
+    return jsonify({"success": True})
+
+# Upload site
+@app.route("/upload", methods=["POST"])
 def upload():
-    data = load_data()
-    username = request.form.get("username")
-    site_name = request.form.get("site_name")
-    file = request.files.get("file")
+    if "user" not in session:
+        return jsonify({"success": False, "message": "Not logged in"})
+    username = session["user"]
+    if username != ADMIN_USER:
+        user = get_user(username)
+        if not user or user[2] <= 0:
+            return jsonify({"success": False, "message": "No uses left. Contact admin for redeem code."})
+        update_uses(username, user[2] - 1)
+    if "file" not in request.files:
+        return jsonify({"success": False, "message": "No file uploaded"})
+    file = request.files["file"]
+    sitename = request.form.get("sitename", "mysite")
+    filename = secure_filename(file.filename)
+    user_folder = os.path.join(UPLOAD_FOLDER, username, sitename)
+    os.makedirs(user_folder, exist_ok=True)
+    file.save(os.path.join(user_folder, filename))
+    with sqlite3.connect(DB_FILE) as conn:
+        c = conn.cursor()
+        c.execute("INSERT INTO sites (username, name, filename) VALUES (?,?,?)",
+                  (username, sitename, filename))
+        conn.commit()
+    return jsonify({"success": True, "message": "Site uploaded!", 
+                    "link": f"/sites/{username}/{sitename}/{filename}"})
 
-    if not username or not site_name or not file:
-        return jsonify({"message": "Missing data"}), 400
-    if username not in data["users"]:
-        return jsonify({"message": "User not found"}), 404
-
-    user = data["users"][username]
-    if username != "admin" and user["uses_left"] <= 0:
-        return jsonify({"message": "No uses left. Redeem a code."}), 403
-
-    site_path = os.path.join(SITES_DIR, site_name)
-    os.makedirs(site_path, exist_ok=True)
-
-    # Extract ZIP into folder
-    zip_path = os.path.join(site_path, "site.zip")
-    file.save(zip_path)
-    with zipfile.ZipFile(zip_path, "r") as zip_ref:
-        zip_ref.extractall(site_path)
-    os.remove(zip_path)
-
-    # Deduct use
-    if username != "admin":
-        user["uses_left"] -= 1
-    if site_name not in user["sites"]:
-        user["sites"].append(site_name)
-
-    save_data(data)
-    return jsonify({"message": f"Site '{site_name}' hosted successfully", "link": f"/sites/{site_name}/"})
-
-# --- List Sites for a User ---
-@app.route("/api/sites", methods=["GET"])
+# List sites
+@app.route("/list_sites", methods=["GET"])
 def list_sites():
-    data = load_data()
-    username = request.args.get("username")
-    if username not in data["users"]:
+    if "user" not in session:
         return jsonify([])
+    username = session["user"]
+    with sqlite3.connect(DB_FILE) as conn:
+        c = conn.cursor()
+        c.execute("SELECT name, filename FROM sites WHERE username=?", (username,))
+        sites = [{"name": n, "filename": f, "link": f"/sites/{username}/{n}/{f}"} for n, f in c.fetchall()]
+    return jsonify(sites)
 
-    user = data["users"][username]
-    sites_info = []
-    for s in user["sites"]:
-        path = os.path.join(SITES_DIR, s)
-        if os.path.exists(path):
-            files = len(os.listdir(path))
-            sites_info.append({
-                "name": s,
-                "files": files,
-                "link": f"/sites/{s}/"
-            })
-    return jsonify(sites_info)
+# Serve sites
+@app.route("/sites/<username>/<sitename>/<filename>")
+def serve_site(username, sitename, filename):
+    return send_from_directory(os.path.join(UPLOAD_FOLDER, username, sitename), filename)
 
-# --- Redeem Code ---
-@app.route("/api/redeem", methods=["POST"])
+# Redeem codes
+@app.route("/redeem", methods=["POST"])
 def redeem():
-    data = load_data()
-    body = request.get_json()
-    username, code = body.get("username"), body.get("code")
+    if "user" not in session:
+        return jsonify({"success": False, "message": "Not logged in"})
+    data = request.json
+    code = data.get("code")
+    username = session["user"]
+    with sqlite3.connect(DB_FILE) as conn:
+        c = conn.cursor()
+        c.execute("SELECT code, slots, remaining FROM codes WHERE code=?", (code,))
+        row = c.fetchone()
+        if not row or row[2] <= 0:
+            return jsonify({"success": False, "message": "Invalid or expired code"})
+        c.execute("SELECT * FROM code_usage WHERE username=? AND code=?", (username, code))
+        if c.fetchone():
+            return jsonify({"success": False, "message": "You already used this code"})
+        c.execute("UPDATE codes SET remaining=remaining-1 WHERE code=?", (code,))
+        c.execute("INSERT INTO code_usage (username, code) VALUES (?,?)", (username, code))
+        c.execute("UPDATE users SET uses_left=uses_left+? WHERE username=?", (row[1], username))
+        conn.commit()
+    return jsonify({"success": True, "message": f"Code redeemed! +{row[1]} uses added."})
 
-    if username not in data["users"]:
-        return jsonify({"message": "User not found"}), 404
-    if code not in data["codes"]:
-        return jsonify({"message": "Invalid code"}), 400
+# Admin: generate code
+@app.route("/generate_code", methods=["POST"])
+def generate_code():
+    if "user" not in session or session["user"] != ADMIN_USER:
+        return jsonify({"success": False, "message": "Admin only"})
+    data = request.json
+    slots = int(data.get("slots", 5))
+    uses = int(data.get("uses", 1))
+    code = secrets.token_hex(4).upper()
+    with sqlite3.connect(DB_FILE) as conn:
+        c = conn.cursor()
+        c.execute("INSERT INTO codes (code, slots, remaining) VALUES (?,?,?)", (code, slots, uses))
+        conn.commit()
+    return jsonify({"success": True, "code": code, "slots": slots, "uses": uses})
 
-    c = data["codes"][code]
-    if c["uses"] <= 0:
-        return jsonify({"message": "Code already fully used"}), 400
+# Admin: list codes
+@app.route("/list_codes")
+def list_codes():
+    if "user" not in session or session["user"] != ADMIN_USER:
+        return jsonify([])
+    with sqlite3.connect(DB_FILE) as conn:
+        c = conn.cursor()
+        c.execute("SELECT code, slots, remaining FROM codes")
+        codes = []
+        for code, slots, remaining in c.fetchall():
+            c.execute("SELECT username FROM code_usage WHERE code=?", (code,))
+            used_by = [u[0] for u in c.fetchall()]
+            codes.append({"code": code, "slots": slots, "remaining": remaining, "used_by": used_by})
+    return jsonify(codes)
 
-    # Add slots
-    data["users"][username]["uses_left"] += c["slots"]
-    c["uses"] -= 1
-    c.setdefault("redeemed_by", []).append(username)
-    save_data(data)
-    return jsonify({"message": f"Code redeemed. {c['slots']} slots added."})
+# Admin: list users
+@app.route("/list_users")
+def list_users():
+    if "user" not in session or session["user"] != ADMIN_USER:
+        return jsonify([])
+    with sqlite3.connect(DB_FILE) as conn:
+        c = conn.cursor()
+        c.execute("SELECT username, uses_left FROM users")
+        users = [{"username": u, "uses_left": l} for u, l in c.fetchall()]
+    return jsonify(users)
 
-# --- Admin: Generate Redeem Code ---
-@app.route("/api/admin/generate", methods=["POST"])
-def admin_generate():
-    body = request.get_json()
-    slots, uses = int(body.get("slots", 5)), int(body.get("uses", 1))
-
-    data = load_data()
-    code = str(uuid.uuid4())[:8]
-    data["codes"][code] = {"slots": slots, "uses": uses, "redeemed_by": []}
-    save_data(data)
-    return jsonify({"code": code, "slots": slots, "uses": uses})
-
-# --- Admin: List Codes ---
-@app.route("/api/admin/codes", methods=["GET"])
-def admin_codes():
-    data = load_data()
-    return jsonify(data["codes"])
-
-# --- Admin: List Users ---
-@app.route("/api/admin/users", methods=["GET"])
-def admin_users():
-    data = load_data()
-    return jsonify({u: {"uses_left": v["uses_left"]} for u, v in data["users"].items()})
-
-# --- Serve Static Files ---
-@app.route("/sites/<site>/<path:filename>")
-def serve_site(site, filename):
-    return send_from_directory(os.path.join(SITES_DIR, site), filename)
-
-@app.route("/sites/<site>/")
-def serve_index(site):
-    return send_from_directory(os.path.join(SITES_DIR, site), "index.html")
-
-# --- Main ---
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
