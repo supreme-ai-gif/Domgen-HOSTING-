@@ -3,295 +3,234 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DomGen Hosting</title>
+  <title>DOMGEN Hosting</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
       margin: 0;
-      padding: 0;
-      background: #f4f6f8;
+      font-family: "Segoe UI", Roboto, sans-serif;
+      background: linear-gradient(135deg, #1d1e30, #0d0f1b);
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
     }
     header {
-      background: #2d3436;
-      color: white;
+      background: linear-gradient(90deg, #6a11cb, #2575fc);
+      padding: 15px;
       text-align: center;
-      padding: 1rem;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
     }
+    header h1 { margin: 0; font-size: 1.6em; }
+    main { flex: 1; display: flex; justify-content: center; padding: 20px; }
     .container {
-      max-width: 900px;
-      margin: auto;
-      padding: 20px;
+      width: 100%;
+      max-width: 1000px;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 20px;
     }
     .card {
-      background: white;
+      background: rgba(255,255,255,0.07);
+      border-radius: 15px;
       padding: 20px;
-      margin-bottom: 20px;
-      border-radius: 10px;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      backdrop-filter: blur(10px);
     }
+    .card h2 { margin-top: 0; font-size: 1.3em; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 8px; }
     input, button, textarea {
-      width: 100%;
-      padding: 10px;
-      margin-top: 10px;
-      border-radius: 6px;
-      border: 1px solid #ccc;
-      font-size: 16px;
+      width: 100%; padding: 10px; margin: 8px 0; border-radius: 8px; border: none; outline: none; font-size: 1em;
     }
+    input, textarea { background: rgba(255,255,255,0.1); color: #fff; }
+    input::placeholder, textarea::placeholder { color: #bbb; }
+    textarea { min-height: 200px; resize: vertical; }
     button {
-      background: #0984e3;
-      color: white;
-      border: none;
-      cursor: pointer;
+      background: linear-gradient(90deg, #2575fc, #6a11cb);
+      color: #fff; font-weight: bold; cursor: pointer;
     }
-    button:hover {
-      background: #74b9ff;
-    }
-    .hidden {
-      display: none;
-    }
-    .flex {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .whatsapp-btn {
-      background: #25d366;
-      margin-top: 15px;
-    }
-    .section-title {
-      font-weight: bold;
-      font-size: 18px;
-      margin-bottom: 10px;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 10px;
-    }
-    table, th, td {
-      border: 1px solid #ddd;
-      padding: 8px;
-    }
-    th {
-      background: #0984e3;
-      color: white;
-    }
+    button:hover { opacity: 0.9; }
+    .btn-logout { background: #e63946; }
+    .btn-whatsapp { background: #25d366; text-decoration: none; text-align: center; display: block; padding: 10px; border-radius: 8px; margin-top: 10px; color: white; }
+    .hidden { display: none; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    table th, table td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.2); text-align: left; }
+    table th { background: rgba(255,255,255,0.15); }
+    pre { background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px; max-height: 150px; overflow-y: auto; }
   </style>
 </head>
 <body>
-  <header>
-    <h1>DomGen Hosting</h1>
-  </header>
+<header>
+  <h1>🌐 DOMGEN HOSTING SERVICE</h1>
+</header>
 
+<main>
   <div class="container">
 
-    <!-- Login / Signup -->
-    <div id="authSection" class="card">
+    <!-- Login Section -->
+    <section class="card" id="loginSection">
       <h2>Login</h2>
-      <input type="text" id="login_username" placeholder="Username">
-      <input type="password" id="login_password" placeholder="Password">
-      <button onclick="login()">Login</button>
-      <hr>
-      <h2>Register</h2>
-      <input type="text" id="register_username" placeholder="Username">
-      <input type="password" id="register_password" placeholder="Password">
-      <button onclick="register()">Register</button>
-    </div>
+      <form id="loginForm">
+        <input id="inUser" type="text" placeholder="Username" required>
+        <input id="inPass" type="password" placeholder="Password" required>
+        <button type="submit">Login</button>
+        <p>New here? <a href="#" onclick="showCreate()">Create account</a></p>
+      </form>
+      <pre id="authMsg"></pre>
+    </section>
+
+    <!-- Create Account -->
+    <section class="card hidden" id="createSection">
+      <h2>Create Account</h2>
+      <form id="createForm">
+        <input id="newUser" type="text" placeholder="Username" required>
+        <input id="newPass" type="password" placeholder="Password" required>
+        <button type="submit">Create</button>
+        <p>Already have account? <a href="#" onclick="showLogin()">Login</a></p>
+      </form>
+      <pre id="createMsg"></pre>
+    </section>
 
     <!-- User Dashboard -->
-    <div id="userDashboard" class="card hidden">
-      <h2>Welcome, <span id="usernameLabel"></span></h2>
-      <p>Remaining Uses: <span id="remainingUses">0</span></p>
+    <section class="card hidden" id="userDashboard">
+      <h2>User Dashboard</h2>
+      <p>Welcome, <strong id="userLabel"></strong> | Uses left: <span id="usesLeft">0</span></p>
 
-      <div class="section">
-        <div class="section-title">Host New Site</div>
-        <textarea id="siteContent" placeholder="Write your HTML content here..."></textarea>
-        <input type="text" id="siteName" placeholder="Site Name (e.g., mysite)">
-        <button onclick="hostSite()">Host</button>
-      </div>
+      <h3>📂 Upload Zip File</h3>
+      <input id="siteName" placeholder="Site name">
+      <input id="siteFile" type="file" accept=".zip">
+      <button onclick="uploadSite()">Upload</button>
 
-      <div class="section">
-        <div class="section-title">Your Hosted Sites</div>
-        <ul id="hostedSitesList"></ul>
-      </div>
+      <h3>✏️ Or Write HTML Directly</h3>
+      <textarea id="htmlContent" placeholder="Write your HTML here..."></textarea>
+      <button onclick="uploadHTML()">Save HTML Site</button>
 
-      <div class="section">
-        <div class="section-title">Redeem Code</div>
-        <input type="text" id="redeemCode" placeholder="Enter redeem code">
-        <button onclick="redeemCode()">Redeem</button>
-      </div>
+      <pre id="uploadResult"></pre>
+      <a id="contactBtn" class="btn-whatsapp hidden" href="https://chat.whatsapp.com/KA28UYJhcCiHneYVHxcCdk" target="_blank">💬 Contact Admin</a>
+      <button class="btn-logout" onclick="logout()">Logout</button>
+    </section>
 
-      <button class="whatsapp-btn" onclick="window.open('https://chat.whatsapp.com/KA28UYJhcCiHneYVHxcCdk')">
-        Contact Admin on WhatsApp
-      </button>
-    </div>
+    <!-- Sites -->
+    <section class="card hidden" id="sitesSection">
+      <h2>Your Sites</h2>
+      <button onclick="listSites()">Refresh</button>
+      <table id="sitesTable"><thead><tr><th>Site</th><th>Files</th><th>Link</th></tr></thead><tbody></tbody></table>
+    </section>
+
+    <!-- Redeem Section -->
+    <section class="card hidden" id="redeemSection">
+      <h2>Redeem Code</h2>
+      <input id="redeemInput" placeholder="Enter redeem code">
+      <button onclick="redeem()">Redeem</button>
+      <pre id="redeemResult"></pre>
+    </section>
 
     <!-- Admin Dashboard -->
-    <div id="adminDashboard" class="card hidden">
+    <section class="card hidden" id="adminDashboard">
       <h2>Admin Dashboard</h2>
+      <input id="genSlots" type="number" placeholder="Slots" value="5">
+      <input id="genUses" type="number" placeholder="Uses" value="1">
+      <button onclick="generateCode()">Generate Code</button>
+      <pre id="genResult"></pre>
+      <table id="codesTable"><thead><tr><th>Code</th><th>Slots</th><th>Remaining Uses</th><th>Used By</th></tr></thead><tbody></tbody></table>
 
-      <div class="section">
-        <div class="section-title">Generate Redeem Code</div>
-        <input type="text" id="codeUses" placeholder="Number of uses for this code">
-        <button onclick="generateCode()">Generate Code</button>
-        <ul id="generatedCodes"></ul>
-      </div>
+      <h3>All Users</h3>
+      <table id="usersTable"><thead><tr><th>Username</th><th>Uses Left</th></tr></thead><tbody></tbody></table>
+    </section>
 
-      <div class="section">
-        <div class="section-title">Active Redeem Codes</div>
-        <table>
-          <thead>
-            <tr>
-              <th>Code</th>
-              <th>Uses Left</th>
-              <th>Redeemed By</th>
-            </tr>
-          </thead>
-          <tbody id="activeCodesTable"></tbody>
-        </table>
-      </div>
-
-      <div class="section">
-        <div class="section-title">All Users</div>
-        <table>
-          <thead>
-            <tr>
-              <th>Username</th>
-              <th>Remaining Uses</th>
-              <th>Hosted Sites</th>
-            </tr>
-          </thead>
-          <tbody id="allUsersTable"></tbody>
-        </table>
-      </div>
-    </div>
   </div>
+</main>
 
-  <script>
-    const API = "https://domgen-hosting.onrender.com/"; // leave empty if frontend served from Flask; or set full URL if separate
+<script>
+const API = "https://domgen-hosting.onrender.com";  // Your backend link
 
-    async function login() {
-      const username = document.getElementById("login_username").value;
-      const password = document.getElementById("login_password").value;
-      const res = await fetch(`${API}/login_user`, {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({username, password})
-      });
-      const data = await res.json();
-      if (data.success) {
-        localStorage.setItem("username", username);
-        localStorage.setItem("is_admin", data.is_admin);
-        if (data.is_admin) {
-          showAdminDashboard();
-        } else {
-          showUserDashboard();
-        }
-      } else {
-        alert(data.message);
-      }
-    }
+let token = null;
+let isAdmin = false;
 
-    async function register() {
-      const username = document.getElementById("register_username").value;
-      const password = document.getElementById("register_password").value;
-      const res = await fetch(`${API}/register_user`, {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({username, password})
-      });
-      const data = await res.json();
-      alert(data.message);
-    }
+function showCreate(){document.getElementById("loginSection").classList.add("hidden");document.getElementById("createSection").classList.remove("hidden");}
+function showLogin(){document.getElementById("createSection").classList.add("hidden");document.getElementById("loginSection").classList.remove("hidden");}
 
-    async function hostSite() {
-      const content = document.getElementById("siteContent").value;
-      const siteName = document.getElementById("siteName").value;
-      const username = localStorage.getItem("username");
-      const res = await fetch(`${API}/host_site`, {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({username, site_name: siteName, content})
-      });
-      const data = await res.json();
-      alert(data.message);
-      showUserDashboard();
-    }
+document.getElementById("loginForm").onsubmit = async (e)=>{
+  e.preventDefault();
+  let u = inUser.value, p = inPass.value;
+  let res = await fetch(API+"/login_user",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:u,password:p})});
+  let data = await res.json();
+  if(data.success){
+    token=data.token; isAdmin=data.admin;
+    userLabel.textContent=u; usesLeft.textContent=data.uses;
+    document.getElementById("loginSection").classList.add("hidden");
+    if(isAdmin){document.getElementById("adminDashboard").classList.remove("hidden");loadAdmin();}
+    else {document.getElementById("userDashboard").classList.remove("hidden");document.getElementById("sitesSection").classList.remove("hidden");document.getElementById("redeemSection").classList.remove("hidden");}
+  } else {authMsg.textContent=data.message;}
+};
 
-    async function redeemCode() {
-      const code = document.getElementById("redeemCode").value;
-      const username = localStorage.getItem("username");
-      const res = await fetch(`${API}/redeem_code`, {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({username, code})
-      });
-      const data = await res.json();
-      alert(data.message);
-      showUserDashboard();
-    }
+document.getElementById("createForm").onsubmit = async (e)=>{
+  e.preventDefault();
+  let u=newUser.value,p=newPass.value;
+  let res=await fetch(API+"/create_account",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:u,password:p})});
+  let data=await res.json();
+  createMsg.textContent=data.message;
+};
 
-    async function generateCode() {
-      const uses = document.getElementById("codeUses").value;
-      const res = await fetch(`${API}/generate_code`, {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({uses})
-      });
-      const data = await res.json();
-      if (data.code) {
-        const li = document.createElement("li");
-        li.textContent = `${data.code} (Uses: ${uses})`;
-        document.getElementById("generatedCodes").appendChild(li);
-        showAdminDashboard();
-      }
-    }
+async function uploadSite(){
+  let f=siteFile.files[0]; if(!f){uploadResult.textContent="Select a zip file"; return;}
+  let fd=new FormData(); fd.append("file",f); fd.append("site",siteName.value);
+  let res=await fetch(API+"/upload",{method:"POST",headers:{"Authorization":"Bearer "+token},body:fd});
+  let data=await res.json(); uploadResult.textContent=data.message;
+  usesLeft.textContent=data.uses;
+  if(data.showContact) contactBtn.classList.remove("hidden");
+}
 
-    async function showUserDashboard() {
-      document.getElementById("authSection").classList.add("hidden");
-      document.getElementById("adminDashboard").classList.add("hidden");
-      document.getElementById("userDashboard").classList.remove("hidden");
+async function uploadHTML(){
+  let html=htmlContent.value.trim(); if(!html){uploadResult.textContent="Write some HTML first"; return;}
+  let fd=new FormData(); fd.append("html",html); fd.append("site",siteName.value||"myhtmlsite");
+  let res=await fetch(API+"/upload_html",{method:"POST",headers:{"Authorization":"Bearer "+token},body:fd});
+  let data=await res.json(); uploadResult.textContent=data.message;
+  usesLeft.textContent=data.uses;
+  if(data.showContact) contactBtn.classList.remove("hidden");
+}
 
-      const username = localStorage.getItem("username");
-      document.getElementById("usernameLabel").textContent = username;
+async function listSites(){
+  let res=await fetch(API+"/list_sites",{headers:{"Authorization":"Bearer "+token}});
+  let data=await res.json();
+  let tb=sitesTable.querySelector("tbody"); tb.innerHTML="";
+  data.sites.forEach(s=>{
+    let tr=document.createElement("tr");
+    tr.innerHTML=`<td>${s.name}</td><td>${s.files}</td><td><a href="${s.link}" target="_blank">${s.link}</a></td>`;
+    tb.appendChild(tr);
+  });
+}
 
-      const res = await fetch(`${API}/get_user/${username}`);
-      const data = await res.json();
-      document.getElementById("remainingUses").textContent = data.remaining_uses;
+async function redeem(){
+  let code=redeemInput.value.trim();
+  let res=await fetch(API+"/redeem",{method:"POST",headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({code})});
+  let data=await res.json(); redeemResult.textContent=data.message; usesLeft.textContent=data.uses;
+}
 
-      const list = document.getElementById("hostedSitesList");
-      list.innerHTML = "";
-      data.hosted_sites.forEach(site => {
-        const li = document.createElement("li");
-        li.innerHTML = `<a href="/sites/${username}/${site}" target="_blank">${site}</a>`;
-        list.appendChild(li);
-      });
-    }
+function logout(){location.reload();}
 
-    async function showAdminDashboard() {
-      document.getElementById("authSection").classList.add("hidden");
-      document.getElementById("userDashboard").classList.add("hidden");
-      document.getElementById("adminDashboard").classList.remove("hidden");
+async function loadAdmin(){
+  let res=await fetch(API+"/admin_data",{headers:{"Authorization":"Bearer "+token}});
+  let data=await res.json();
+  let tb1=codesTable.querySelector("tbody"); tb1.innerHTML="";
+  data.codes.forEach(c=>{
+    let tr=document.createElement("tr");
+    tr.innerHTML=`<td>${c.code}</td><td>${c.slots}</td><td>${c.remaining}</td><td>${c.used_by.join(", ")}</td>`;
+    tb1.appendChild(tr);
+  });
+  let tb2=usersTable.querySelector("tbody"); tb2.innerHTML="";
+  data.users.forEach(u=>{
+    let tr=document.createElement("tr");
+    tr.innerHTML=`<td>${u.username}</td><td>${u.uses}</td>`;
+    tb2.appendChild(tr);
+  });
+}
 
-      const res = await fetch(`${API}/admin_data`);
-      const data = await res.json();
-
-      const codesTable = document.getElementById("activeCodesTable");
-      codesTable.innerHTML = "";
-      data.codes.forEach(c => {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `<td>${c.code}</td><td>${c.uses_left}</td><td>${c.redeemed_by.join(", ")}</td>`;
-        codesTable.appendChild(tr);
-      });
-
-      const usersTable = document.getElementById("allUsersTable");
-      usersTable.innerHTML = "";
-      data.users.forEach(u => {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `<td>${u.username}</td><td>${u.remaining_uses}</td><td>${u.hosted_sites.join(", ")}</td>`;
-        usersTable.appendChild(tr);
-      });
-    }
-  </script>
+async function generateCode(){
+  let slots=genSlots.value, uses=genUses.value;
+  let res=await fetch(API+"/generate_code",{method:"POST",headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({slots,uses})});
+  let data=await res.json(); genResult.textContent=data.message; loadAdmin();
+}
+</script>
 </body>
 </html>
